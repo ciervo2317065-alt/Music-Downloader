@@ -33,8 +33,10 @@ async function initYtDlp() {
 
   // Test yt-dlp works
   try {
-    const version = await ytDlp.execPromise(['--version']);
+    const version = await ytDlp.execPromise(['--version'], SPAWN_OPTS);
     console.log('yt-dlp version:', version.trim());
+    console.log('Node.js path:', process.execPath);
+    console.log('ffmpeg path:', ffmpegPath);
   } catch (e) {
     console.error('yt-dlp test failed:', e.message);
   }
@@ -55,13 +57,20 @@ async function initYtDlp() {
 // Path to cookies file (if it exists)
 const COOKIES_PATH = path.join(__dirname, 'cookies.txt');
 
+// Spawn options — ensure yt-dlp can find Node.js for JS challenge solving
+const nodeDir = path.dirname(process.execPath);
+const spawnEnv = { ...process.env, PATH: `${nodeDir}:${process.env.PATH || ''}` };
+const SPAWN_OPTS = { env: spawnEnv };
+
 // Common yt-dlp flags to bypass cloud IP restrictions
 function getBaseArgs() {
   const args = [
     '--no-playlist',
     '--no-check-certificates',
+    '--no-warnings',
     '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-    '--extractor-args', 'youtube:player_client=web,default',
+    '--extractor-args', 'youtube:player_client=web_creator,mweb',
+    '--sleep-requests', '1',
   ];
   if (fs.existsSync(COOKIES_PATH)) {
     args.push('--cookies', COOKIES_PATH);
@@ -99,7 +108,7 @@ app.get('/api/info', async (req, res) => {
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
   try {
-    const info = JSON.parse(await ytDlp.execPromise([url, ...getBaseArgs(), '--dump-json']));
+    const info = JSON.parse(await ytDlp.execPromise([url, ...getBaseArgs(), '--dump-json'], SPAWN_OPTS));
     const seen = new Set();
     const videoFormats = (info.formats || [])
       .filter(f => f.vcodec && f.vcodec !== 'none' && f.height)
@@ -154,7 +163,7 @@ app.post('/api/download/start', async (req, res) => {
   // Run download in background
   (async () => {
     try {
-      const info = JSON.parse(await ytDlp.execPromise([url, ...getBaseArgs(), '--dump-json']));
+      const info = JSON.parse(await ytDlp.execPromise([url, ...getBaseArgs(), '--dump-json'], SPAWN_OPTS));
       const title = sanitizeFilename(info.title);
 
       let args;
@@ -189,7 +198,7 @@ app.post('/api/download/start', async (req, res) => {
       job.stage = 'Downloading...';
 
       // Use exec to track progress events
-      const proc = ytDlp.exec(args);
+      const proc = ytDlp.exec(args, SPAWN_OPTS);
 
       proc.on('ytDlpEvent', (type, data) => {
         if (type === 'download') {
