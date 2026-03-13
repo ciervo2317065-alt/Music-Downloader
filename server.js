@@ -38,15 +38,36 @@ async function initYtDlp() {
   } catch (e) {
     console.error('yt-dlp test failed:', e.message);
   }
+
+  // Write YouTube cookies from env variable (if set)
+  if (process.env.YOUTUBE_COOKIES) {
+    const cookiePath = path.join(__dirname, 'cookies.txt');
+    try {
+      const decoded = Buffer.from(process.env.YOUTUBE_COOKIES, 'base64').toString('utf-8');
+      fs.writeFileSync(cookiePath, decoded);
+      console.log('YouTube cookies loaded from environment variable.');
+    } catch (e) {
+      console.error('Failed to write cookies:', e.message);
+    }
+  }
 }
 
+// Path to cookies file (if it exists)
+const COOKIES_PATH = path.join(__dirname, 'cookies.txt');
+
 // Common yt-dlp flags to bypass cloud IP restrictions
-const YT_BASE_ARGS = [
-  '--no-playlist',
-  '--no-check-certificates',
-  '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  '--extractor-args', 'youtube:player_client=web,default',
-];
+function getBaseArgs() {
+  const args = [
+    '--no-playlist',
+    '--no-check-certificates',
+    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    '--extractor-args', 'youtube:player_client=web,default',
+  ];
+  if (fs.existsSync(COOKIES_PATH)) {
+    args.push('--cookies', COOKIES_PATH);
+  }
+  return args;
+}
 
 function formatDuration(seconds) {
   if (!seconds) return '0:00';
@@ -78,7 +99,7 @@ app.get('/api/info', async (req, res) => {
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
   try {
-    const info = await ytDlp.getVideoInfo([url, ...YT_BASE_ARGS]);
+    const info = JSON.parse(await ytDlp.execPromise([url, ...getBaseArgs(), '--dump-json']));
     const seen = new Set();
     const videoFormats = (info.formats || [])
       .filter(f => f.vcodec && f.vcodec !== 'none' && f.height)
@@ -133,7 +154,7 @@ app.post('/api/download/start', async (req, res) => {
   // Run download in background
   (async () => {
     try {
-      const info = await ytDlp.getVideoInfo([url, ...YT_BASE_ARGS]);
+      const info = JSON.parse(await ytDlp.execPromise([url, ...getBaseArgs(), '--dump-json']));
       const title = sanitizeFilename(info.title);
 
       let args;
@@ -141,7 +162,7 @@ app.post('/api/download/start', async (req, res) => {
         job.filename = `${title}.mp3`;
         job.contentType = 'audio/mpeg';
         args = [
-          url, ...YT_BASE_ARGS,
+          url, ...getBaseArgs(),
           '-x', '--audio-format', 'mp3', '--audio-quality', '192K',
           '--ffmpeg-location', ffmpegPath,
           '--newline',
@@ -154,7 +175,7 @@ app.post('/api/download/start', async (req, res) => {
           ? `${itag}+bestaudio/bestvideo+bestaudio/best`
           : 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best';
         args = [
-          url, ...YT_BASE_ARGS,
+          url, ...getBaseArgs(),
           '-f', fmt,
           '--merge-output-format', 'mp4',
           '--postprocessor-args', 'Merger+ffmpeg:-c:v copy -c:a aac -b:a 192k',
