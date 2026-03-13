@@ -103,19 +103,23 @@ function renderQualityBtns() {
   }
 }
 
-// ── Download services (multiple fallbacks) ──
-const DOWNLOAD_SERVICES = {
-  mp3: [
-    (id) => `https://cnvmp3.com/mp3/${id}`,
-    (id) => `https://y2meta.tube/watch?v=${id}`,
-    (id) => `https://ytmp3.cc/en/youtube-to-mp3/?url=https://www.youtube.com/watch?v=${id}`,
-  ],
-  mp4: [
-    (id, q) => `https://y2meta.tube/watch?v=${id}`,
-    (id, q) => `https://10downloader.com/download?v=https://www.youtube.com/watch?v=${id}`,
-    (id, q) => `https://ssyoutube.com/watch?v=${id}`,
-  ]
-};
+// ── Download services (working as of 2026) ──
+function getDownloadUrl(format, videoId) {
+  const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  if (format === 'mp3') {
+    return `https://loader.to/api/button/?url=${encodeURIComponent(ytUrl)}&f=mp3`;
+  } else {
+    return `https://loader.to/api/button/?url=${encodeURIComponent(ytUrl)}&f=mp4`;
+  }
+}
+
+// Fallback services if primary fails
+const FALLBACK_SERVICES = [
+  (id) => `https://cnvmp3.com/?url=https://www.youtube.com/watch?v=${id}`,
+  (id) => `https://savefrom.net/?url=https://www.youtube.com/watch?v=${id}`,
+  (id) => `https://ssyoutube.com/watch?v=${id}`,
+  (id) => `https://y2mate.nu/youtube-to-mp3/?url=https://www.youtube.com/watch?v=${id}`,
+];
 
 async function startDownload() {
   if (!currentVideoId) return;
@@ -131,19 +135,32 @@ async function startDownload() {
   progressFill.style.background = '';
   progressPercent.textContent = '';
   progressText.textContent = 'Opening download page...';
-  progressSpeed.textContent = 'A new tab will open with your download';
+  progressSpeed.textContent = '';
 
-  const services = DOWNLOAD_SERVICES[currentFormat] || DOWNLOAD_SERVICES.mp4;
-  const quality = currentItag || '720';
-  const downloadUrl = services[0](currentVideoId, quality);
+  const downloadUrl = getDownloadUrl(currentFormat, currentVideoId);
 
   // Open download service in new tab
-  window.open(downloadUrl, '_blank');
+  const newTab = window.open(downloadUrl, '_blank');
+
+  if (!newTab) {
+    // Popup blocked — show link instead
+    progressText.textContent = 'Pop-up blocked! Click the link below:';
+    progressSpeed.innerHTML = `<a href="${downloadUrl}" target="_blank" style="color:#38bdf8;text-decoration:underline;">Open download page</a>`;
+    return;
+  }
 
   progressText.textContent = 'Download page opened!';
-  progressSpeed.textContent = 'Complete the download in the new tab';
+  progressSpeed.textContent = 'Complete the download in the new tab. If it doesn\'t work, try a fallback below.';
 
-  setTimeout(resetProgress, 5000);
+  // Show fallback links
+  setTimeout(() => {
+    const fallbackHtml = FALLBACK_SERVICES
+      .map((fn, i) => `<a href="${fn(currentVideoId)}" target="_blank" style="color:#38bdf8;text-decoration:underline;margin-right:12px;">Mirror ${i + 1}</a>`)
+      .join('');
+    progressSpeed.innerHTML = `If it didn't work, try: ${fallbackHtml}`;
+  }, 2000);
+
+  setTimeout(resetProgress, 15000);
 }
 
 function resetProgress() {
