@@ -2,6 +2,7 @@ let currentFormat = 'mp3';
 let currentItag = null;
 let videoFormats = [];
 let currentUrl = '';
+let currentVideoId = '';
 
 // ── Fetch video info ──
 async function fetchInfo() {
@@ -31,6 +32,7 @@ async function fetchInfo() {
     if (!res.ok) throw new Error(data.error || 'Failed to fetch video info');
 
     currentUrl = url;
+    currentVideoId = data.videoId;
     videoFormats = data.videoFormats || [];
 
     document.getElementById('thumbnail').src = data.thumbnail || '';
@@ -81,22 +83,16 @@ function renderQualityBtns() {
   const container = document.getElementById('qualityBtns');
   container.innerHTML = '';
 
-  if (!videoFormats.length) {
-    container.innerHTML = '<span style="font-size:0.8rem;color:#64748b">No qualities found</span>';
-    return;
-  }
-
   videoFormats.forEach((f, i) => {
     const btn = document.createElement('button');
     btn.className = 'quality-btn' + (i === 0 ? ' selected' : '');
-    btn.textContent = f.quality || `Format ${f.itag}`;
-    btn.dataset.itag = f.itag;
+    btn.textContent = f.quality;
     if (i === 0) currentItag = f.itag;
 
     btn.addEventListener('click', () => {
       document.querySelectorAll('.quality-btn').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
-      currentItag = parseInt(f.itag);
+      currentItag = f.itag;
       document.getElementById('downloadBtnText').textContent = `Download MP4 (${f.quality})`;
     });
     container.appendChild(btn);
@@ -107,99 +103,47 @@ function renderQualityBtns() {
   }
 }
 
-// ── Download with real progress ──
-async function startDownload() {
-  if (!currentUrl) return;
+// ── Download services (multiple fallbacks) ──
+const DOWNLOAD_SERVICES = {
+  mp3: [
+    (id) => `https://cnvmp3.com/mp3/${id}`,
+    (id) => `https://y2meta.tube/watch?v=${id}`,
+    (id) => `https://ytmp3.cc/en/youtube-to-mp3/?url=https://www.youtube.com/watch?v=${id}`,
+  ],
+  mp4: [
+    (id, q) => `https://y2meta.tube/watch?v=${id}`,
+    (id, q) => `https://10downloader.com/download?v=https://www.youtube.com/watch?v=${id}`,
+    (id, q) => `https://ssyoutube.com/watch?v=${id}`,
+  ]
+};
 
-  const downloadBtn = document.getElementById('downloadBtn');
+async function startDownload() {
+  if (!currentVideoId) return;
+
   const progressArea = document.getElementById('progressArea');
   const progressFill = document.getElementById('progressFill');
   const progressPercent = document.getElementById('progressPercent');
   const progressText = document.getElementById('progressText');
   const progressSpeed = document.getElementById('progressSpeed');
 
-  downloadBtn.disabled = true;
   progressArea.classList.remove('hidden');
-  progressFill.style.width = '0%';
+  progressFill.style.width = '100%';
   progressFill.style.background = '';
-  progressPercent.textContent = '0%';
-  progressText.textContent = 'Starting...';
-  progressSpeed.textContent = '';
+  progressPercent.textContent = '';
+  progressText.textContent = 'Opening download page...';
+  progressSpeed.textContent = 'A new tab will open with your download';
 
-  try {
-    // 1. Start the download job
-    const startRes = await fetch('/api/download/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url: currentUrl,
-        format: currentFormat,
-        itag: currentItag
-      })
-    });
-    const { jobId } = await startRes.json();
-    if (!startRes.ok) throw new Error('Failed to start download');
+  const services = DOWNLOAD_SERVICES[currentFormat] || DOWNLOAD_SERVICES.mp4;
+  const quality = currentItag || '720';
+  const downloadUrl = services[0](currentVideoId, quality);
 
-    // 2. Listen to SSE for progress
-    const done = await new Promise((resolve, reject) => {
-      const evtSource = new EventSource(`/api/download/progress/${jobId}`);
+  // Open download service in new tab
+  window.open(downloadUrl, '_blank');
 
-      evtSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+  progressText.textContent = 'Download page opened!';
+  progressSpeed.textContent = 'Complete the download in the new tab';
 
-        // Update progress bar
-        progressFill.style.width = `${data.percent}%`;
-        progressPercent.textContent = `${Math.round(data.percent)}%`;
-        progressText.textContent = data.stage;
-
-        // Show speed & ETA
-        let speedInfo = '';
-        if (data.speed) speedInfo += `${data.speed}/s`;
-        if (data.eta && data.eta !== 'Unknown') speedInfo += ` • ETA ${data.eta}`;
-        progressSpeed.textContent = speedInfo;
-
-        if (data.status === 'done') {
-          evtSource.close();
-          resolve(jobId);
-        }
-        if (data.status === 'error') {
-          evtSource.close();
-          reject(new Error(data.error || 'Download failed'));
-        }
-      };
-
-      evtSource.onerror = () => {
-        evtSource.close();
-        reject(new Error('Connection lost'));
-      };
-    });
-
-    // 3. Trigger file download
-    progressText.textContent = 'Saving file...';
-    const a = document.createElement('a');
-    a.href = `/api/download/file/${done}`;
-    a.download = '';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    progressFill.style.width = '100%';
-    progressPercent.textContent = '100%';
-    progressText.textContent = 'Download complete!';
-    progressSpeed.textContent = '';
-
-    setTimeout(resetProgress, 4000);
-
-  } catch (err) {
-    progressFill.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
-    progressFill.style.width = '100%';
-    progressPercent.textContent = '';
-    progressText.textContent = `Error: ${err.message}`;
-    progressSpeed.textContent = '';
-    setTimeout(resetProgress, 5000);
-  } finally {
-    downloadBtn.disabled = false;
-  }
+  setTimeout(resetProgress, 5000);
 }
 
 function resetProgress() {
