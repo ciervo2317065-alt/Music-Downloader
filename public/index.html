@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YT Converter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Animated background blobs -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
+
+  <div class="container">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="10" fill="url(#logoGrad)"/>
+          <path d="M13 10.5L22 16L13 21.5V10.5Z" fill="white"/>
+          <defs>
+            <linearGradient id="logoGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#7c3aed"/>
+              <stop offset="1" stop-color="#06b6d4"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span>YT<strong>Convert</strong></span>
+      </div>
+      <div class="header-badge">Free &amp; Fast</div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+      <h1 class="hero-title">
+        Convert YouTube to<br/>
+        <span class="gradient-text">MP4 &amp; MP3</span>
+      </h1>
+      <p class="hero-subtitle">Paste any YouTube link and download in seconds. No signup required.</p>
+    </section>
+
+    <!-- Input Card -->
+    <div class="card input-card">
+      <div class="input-wrapper">
+        <div class="input-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+          </svg>
+        </div>
+        <input
+          id="urlInput"
+          type="text"
+          placeholder="Paste YouTube link here..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="fetchBtn" class="btn btn-primary" onclick="fetchInfo()">
+          <span class="btn-text">Get Video</span>
+          <span class="btn-spinner hidden"></span>
+        </button>
+      </div>
+      <p id="inputError" class="error-msg hidden"></p>
+    </div>
+
+    <!-- Video Preview Card (hidden by default) -->
+    <div id="previewCard" class="card preview-card hidden">
+      <div class="preview-inner">
+        <div class="thumbnail-wrap">
+          <img id="thumbnail" src="" alt="thumbnail" />
+          <div class="duration-badge" id="duration"></div>
+          <div class="play-overlay">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="video-meta">
+          <p class="video-channel" id="author"></p>
+          <h3 class="video-title" id="videoTitle"></h3>
+
+          <div class="format-section">
+            <p class="format-label">Choose format</p>
+            <div class="format-tabs">
+              <button class="format-tab active" id="tab-mp3" onclick="selectFormat('mp3')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 18V5l12-2v13"/>
+                  <circle cx="6" cy="18" r="3"/>
+                  <circle cx="18" cy="16" r="3"/>
+                </svg>
+                MP3
+              </button>
+              <button class="format-tab" id="tab-mp4" onclick="selectFormat('mp4')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                  <line x1="7" y1="2" x2="7" y2="22"/>
+                  <line x1="17" y1="2" x2="17" y2="22"/>
+                  <line x1="2" y1="12" x2="22" y2="12"/>
+                  <line x1="2" y1="7" x2="7" y2="7"/>
+                  <line x1="2" y1="17" x2="7" y2="17"/>
+                  <line x1="17" y1="17" x2="22" y2="17"/>
+                  <line x1="17" y1="7" x2="22" y2="7"/>
+                </svg>
+                MP4
+              </button>
+            </div>
+          </div>
+
+          <!-- MP4 quality selector -->
+          <div id="qualitySection" class="quality-section hidden">
+            <p class="format-label">Quality</p>
+            <div id="qualityBtns" class="quality-btns"></div>
+          </div>
+
+          <button id="downloadBtn" class="btn btn-download" onclick="startDownload()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span id="downloadBtnText">Download MP3</span>
+          </button>
+
+          <!-- Progress -->
+          <div id="progressArea" class="progress-area hidden">
+            <div class="progress-header">
+              <span id="progressText" class="progress-stage">Starting...</span>
+              <span id="progressPercent" class="progress-percent">0%</span>
+            </div>
+            <div class="progress-bar-wrap">
+              <div class="progress-bar-fill" id="progressFill"></div>
+            </div>
+            <p id="progressSpeed" class="progress-speed"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        <div>
+          <strong>Fast Conversion</strong>
+          <span>Powered by FFmpeg</span>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔒</div>
+        <div>
+          <strong>Private</strong>
+          <span>No data stored</span>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🎵</div>
+        <div>
+          <strong>High Quality</strong>
+          <span>Up to 1080p &amp; 320kbps</span>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <p>For personal use only. Respect copyright laws.</p>
+    </footer>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

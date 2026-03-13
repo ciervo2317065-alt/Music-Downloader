@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:/Users/cierv/OneDrive/Desktop/Eventtt\" && npm install 2>&1)",
+      "Bash(cd \"C:/Users/cierv/OneDrive/Desktop/Eventtt\" && node server.js)",
+      "Bash(cd \"C:/Users/cierv/OneDrive/Desktop/Eventtt\" && npm install yt-dlp-wrap 2>&1)",
+      "Bash(taskkill /F /IM node.exe 2>&1; echo \"killed\")",
+      "Bash(taskkill //F //IM node.exe 2>&1; echo \"done\")",
+      "Bash(mkdir -p \"C:/Users/cierv/OneDrive/Desktop/Eventtt/bin\" && powershell -Command \"Invoke-WebRequest -Uri 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe' -OutFile 'C:/Users/cierv/OneDrive/Desktop/Eventtt/bin/yt-dlp.exe' -UseBasicParsing\" 2>&1)",
+      "Bash(taskkill //F //IM node.exe 2>&1; sleep 1; cd \"C:/Users/cierv/OneDrive/Desktop/Eventtt\" && node server.js)"
+    ]
+  }
+}
